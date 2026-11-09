@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     def _check_consistency(self) -> Self:
         if self.disqualify_score >= self.auto_approve_score:
             raise ValueError("DISQUALIFY_SCORE must be lower than AUTO_APPROVE_SCORE")
+        # A real provider without its key or model would fail on every lead; fail at startup.
+        if self.llm_mode is not LLMMode.MOCK and not self.llm_api_key.get_secret_value():
+            raise ValueError(f"LLM_API_KEY is required when LLM_MODE={self.llm_mode.value}")
+        if self.llm_mode is LLMMode.OPENAI and not self.llm_model:
+            raise ValueError("LLM_MODEL is required when LLM_MODE=openai")
         if self.is_production:
             missing = [
                 name
@@ -94,8 +99,6 @@ class Settings(BaseSettings):
                 )
                 if not value.get_secret_value()
             ]
-            if self.llm_mode is not LLMMode.MOCK and not self.llm_api_key.get_secret_value():
-                missing.append("LLM_API_KEY")
             if missing:
                 raise ValueError(f"Missing required production settings: {', '.join(missing)}")
         return self
