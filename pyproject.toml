@@ -53,7 +53,7 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]  # pytest asserts; dummy secrets in tests
+"tests/**" = ["S101", "S105", "S106", "S311"]  # asserts, dummy secrets, seeded RNGs
 
 [tool.mypy]
 python_version = "3.12"
