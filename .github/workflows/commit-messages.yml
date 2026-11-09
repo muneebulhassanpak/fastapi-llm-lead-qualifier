@@ -1,0 +1,44 @@
+name: Commit messages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+# PRs are rebase-merged, so every commit lands on main as-is.
+# Job id `commit-messages` is a required check in the "Protect main" ruleset.
+jobs:
+  commit-messages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Every commit follows Conventional Commits
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pattern='^(feat|fix|chore|docs|test|refactor|perf|ci|build|revert)(\([a-z0-9-]+\))?!?: .+'
+          bad=0
+          while IFS= read -r line; do
+            sha=${line%% *}
+            subject=${line#* }
+            case "$subject" in
+              "fixup! "*|"squash! "*|"amend! "*)
+                echo "::error::$sha is a fixup commit; squash it before merging: $subject"; bad=1; continue;;
+            esac
+            if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+              echo "::error::$sha does not follow Conventional Commits: $subject"; bad=1
+            elif [ ${#subject} -gt 100 ]; then
+              echo "::error::$sha subject is longer than 100 characters: $subject"; bad=1
+            fi
+          done < <(git log --format='%h %s' --no-merges "$BASE..$HEAD")
+          if [ "$bad" -ne 0 ]; then
+            echo "Allowed: <type>(<optional scope>): <subject>, e.g. 'feat(worker): add retry backoff'."
+            exit 1
+          fi
+          echo "All commit messages follow Conventional Commits."
