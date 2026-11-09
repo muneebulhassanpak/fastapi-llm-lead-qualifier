@@ -17,6 +17,7 @@ dependencies = [
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
     "typer>=0.28.0",
+    "anthropic>=2.6.0",
 ]
 
 [tool.uv]
