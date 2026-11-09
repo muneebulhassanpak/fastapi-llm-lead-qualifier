@@ -97,7 +97,22 @@ class LeadEventOut(BaseModel):
 
 
 class CRMState(BaseModel):
-    external_id: str | None
+    provider: str | None = Field(
+        description="CRM used by the latest sync attempt.", examples=["mock"]
+    )
+    external_id: str | None = Field(description="The lead's record ID in the CRM, once synced.")
+    attempts: int = Field(description="Sync attempts so far, failed or not.")
+    last_error: str | None = Field(description="Error of the latest attempt, if it failed.")
+
+    @classmethod
+    def from_model(cls, lead: Lead) -> Self:
+        latest = lead.sync_attempts[-1] if lead.sync_attempts else None
+        return cls(
+            provider=latest.provider if latest else None,
+            external_id=lead.crm_external_id,
+            attempts=len(lead.sync_attempts),
+            last_error=latest.error if latest else None,
+        )
 
 
 class LeadDetail(LeadSummary):
@@ -117,7 +132,7 @@ class LeadDetail(LeadSummary):
             metadata=lead.extra_metadata,
             extracted=lead.extracted,
             reason=lead.reason,
-            crm=CRMState(external_id=lead.crm_external_id),
+            crm=CRMState.from_model(lead),
             events=[LeadEventOut.from_model(e) for e in lead.events],
         )
 

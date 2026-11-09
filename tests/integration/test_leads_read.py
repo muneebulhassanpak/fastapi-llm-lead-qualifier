@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Lead
+from app.db.models import Lead, SyncAttempt
 from app.domain.status import LeadStatus
 from tests.integration.conftest import MakeLead, MakeTenant, TenantWithKey
 
@@ -28,8 +28,40 @@ async def test_get_lead_returns_detail_with_events(
     assert body["message"] == "Need an audit"
     assert body["metadata"] == {"utm": "ads"}
     assert body["score"] is None
-    assert body["crm"] == {"external_id": None}
+    assert body["crm"] == {
+        "provider": None,
+        "external_id": None,
+        "attempts": 0,
+        "last_error": None,
+    }
     assert [e["type"] for e in body["events"]] == ["received"]
+
+
+async def test_get_lead_shows_crm_sync_state(
+    client: AsyncClient, acme: TenantWithKey, make_lead: MakeLead, db_session: AsyncSession
+) -> None:
+    lead = await make_lead(acme.tenant, status=LeadStatus.SYNC_FAILED)
+    for error in ("CRMTransientError: 503 first", "CRMTransientError: 503 second"):
+        db_session.add(
+            SyncAttempt(
+                lead_id=lead.id,
+                provider="mock",
+                status="failed",
+                http_status=503,
+                error=error,
+                duration_ms=12,
+            )
+        )
+    await db_session.commit()
+
+    response = await client.get(f"/v1/leads/{lead.id}", headers=acme.headers)
+
+    assert response.json()["crm"] == {
+        "provider": "mock",
+        "external_id": None,
+        "attempts": 2,
+        "last_error": "CRMTransientError: 503 second",
+    }
 
 
 async def test_unknown_lead_is_404(client: AsyncClient, acme: TenantWithKey) -> None:
