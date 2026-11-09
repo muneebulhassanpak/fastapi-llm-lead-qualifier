@@ -23,4 +23,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Lead status rules in one place; every status change records an audit event.
 - `/v1/health` checks the database and returns 503 when it is unreachable.
 - Neon and other hosted Postgres connection strings work as copied.
+- Background job queue on a Postgres table, claimed with `FOR UPDATE SKIP LOCKED`, with exponential backoff and jitter, a dead-letter state, and recovery of jobs whose worker died mid-run.
+- An in-process worker started by the API; handler writes and job completion commit together. Creating a lead queues its qualification job in the same transaction.
 - CI: integration tests on Postgres, a `migrations` job (single head, upgrade, `alembic check`, downgrade, upgrade), and a Docker smoke test that runs migrations.

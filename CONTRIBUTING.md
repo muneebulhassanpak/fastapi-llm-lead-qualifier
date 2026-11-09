@@ -75,6 +75,15 @@ docker compose exec api python -m app.cli create-tenant --name "Acme"
 
 Keys are stored as an HMAC-SHA256 hash keyed with `API_KEY_PEPPER`. Changing the pepper invalidates every existing key.
 
+## Background jobs
+
+Slow work (LLM scoring, CRM sync) runs as jobs in the `jobs` table, processed by a worker that runs inside the API process (`WORKER_ENABLED=true`).
+
+- Enqueue with `app.worker.queue.enqueue(session, ...)` in the same transaction as the change that needs it.
+- A handler subclasses `JobHandler` and is registered in `app/worker/handlers.py`. Its `run` writes commit together with the job's completion; on an exception they roll back and the job retries with backoff.
+- Raise `PermanentJobError` when a retry cannot help. After the last attempt the job is `failed` and the handler's `on_dead_letter` runs.
+- Handlers must be idempotent: a job can run twice if a worker dies mid-job (its lock times out after `JOB_LOCK_TIMEOUT_SECONDS`).
+
 ## Database migrations
 
 ```bash
