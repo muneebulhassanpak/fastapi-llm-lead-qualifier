@@ -26,3 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Background job queue on a Postgres table, claimed with `FOR UPDATE SKIP LOCKED`, with exponential backoff and jitter, a dead-letter state, and recovery of jobs whose worker died mid-run.
 - An in-process worker started by the API; handler writes and job completion commit together. Creating a lead queues its qualification job in the same transaction.
 - CI: integration tests on Postgres, a `migrations` job (single head, upgrade, `alembic check`, downgrade, upgrade), and a Docker smoke test that runs migrations.
+- LLM qualification: each new lead is scored by Anthropic (default `claude-haiku-5-5`), OpenAI or an offline mock provider using structured outputs, then auto-approved, disqualified or sent to review with a recorded reason.
+- A versioned prompt that keeps lead text out of the instructions, and opt-in live tests (`pytest -m live_llm`) including prompt-injection attempts.
+- A per-tenant daily cap on model calls, with token usage recorded per tenant and day.

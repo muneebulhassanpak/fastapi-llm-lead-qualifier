@@ -87,9 +87,23 @@ Keys are stored as an HMAC-SHA256 hash keyed with `API_KEY_PEPPER`. Changing the
 Slow work (LLM scoring, CRM sync) runs as jobs in the `jobs` table, processed by a worker that runs inside the API process (`WORKER_ENABLED=true`).
 
 - Enqueue with `app.worker.queue.enqueue(session, ...)` in the same transaction as the change that needs it.
-- A handler subclasses `JobHandler` and is registered in `app/worker/handlers.py`. Its `run` writes commit together with the job's completion; on an exception they roll back and the job retries with backoff.
+- A handler subclasses `JobHandler` (`app/worker/handlers.py`) and is registered in `app/worker/registry.py`. Its `run` writes commit together with the job's completion; on an exception they roll back and the job retries with backoff.
 - Raise `PermanentJobError` when a retry cannot help. After the last attempt the job is `failed` and the handler's `on_dead_letter` runs.
 - Handlers must be idempotent: a job can run twice if a worker dies mid-job (its lock times out after `JOB_LOCK_TIMEOUT_SECONDS`).
+
+## LLM qualification
+
+The `qualify_lead` handler (`app/worker/qualify.py`) asks the provider chosen by `LLM_MODE` for a structured `Qualification`, then `decide()` in `app/domain/qualification.py` routes the lead using `AUTO_APPROVE_SCORE`, `DISQUALIFY_SCORE` and `MIN_CONFIDENCE`.
+
+- The prompt lives in `app/llm/prompts/qualify_v1.md`. Changing its meaning means a new file and a new `PROMPT_VERSION`, so every `scored` event says which prompt produced it.
+- The lead's text only ever goes inside `<enquiry>` tags in the user message, never in the system prompt.
+- Invalid model output gets one more try; refusals and rejected requests go straight to review; timeouts, rate limits and 5xx errors retry the job with backoff, and the lead goes to review once attempts run out.
+- Tests use the `mock` provider or a scripted fake and never call a real model. To check the real one (it costs money):
+
+```bash
+# in .env: LLM_MODE=anthropic and LLM_API_KEY=...
+uv run pytest -m live_llm
+```
 
 ## Database migrations
 
