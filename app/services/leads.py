@@ -158,11 +158,11 @@ async def lock_lead(session: AsyncSession, lead_id: str) -> Lead | None:
 
 
 async def get_lead(session: AsyncSession, tenant_id: str, lead_id: str) -> Lead | None:
-    """A lead with its events, only if it belongs to the tenant."""
+    """A lead with its events and CRM sync attempts, only if it belongs to the tenant."""
     return await session.scalar(
         select(Lead)
         .where(Lead.id == lead_id, Lead.tenant_id == tenant_id)
-        .options(selectinload(Lead.events))
+        .options(selectinload(Lead.events), selectinload(Lead.sync_attempts))
     )
 
 

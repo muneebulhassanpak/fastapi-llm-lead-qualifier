@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -20,6 +20,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, CreatedAtMixin, TimestampMixin
 from app.domain.ids import new_id
 from app.domain.status import LeadStatus
+
+if TYPE_CHECKING:
+    from app.db.models.crm import SyncAttempt
 
 _STATUS_VALUES = ", ".join(f"'{s.value}'" for s in LeadStatus)
 
@@ -57,6 +60,10 @@ class Lead(TimestampMixin, Base):
 
     events: Mapped[list["LeadEvent"]] = relationship(
         back_populates="lead", order_by="LeadEvent.id", cascade="all, delete-orphan"
+    )
+    # Read-only: attempts are written directly by the sync handler.
+    sync_attempts: Mapped[list["SyncAttempt"]] = relationship(
+        order_by="SyncAttempt.id", viewonly=True
     )
 
 
