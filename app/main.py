@@ -43,6 +43,7 @@ OPENAPI_TAGS = [
         "name": "webhooks",
         "description": "Signed deliveries from outside services (a generic format, or Tally).",
     },
+    {"name": "stats", "description": "Summary numbers for dashboards."},
 ]
 
 
