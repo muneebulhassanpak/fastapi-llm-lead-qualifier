@@ -105,6 +105,14 @@ The `qualify_lead` handler (`app/worker/qualify.py`) asks the provider chosen by
 uv run pytest -m live_llm
 ```
 
+## CRM sync
+
+Approving a lead (automatically or, from Phase 07, by a person) queues a `sync_lead` job in the same transaction. The handler (`app/worker/sync.py`) moves the lead `approved` → `syncing` → `synced`, calling the adapter chosen by `CRM_MODE` with no transaction open, and writes one `sync_attempts` row per try.
+
+- Adapters implement `CRMAdapter.upsert_lead` (`app/crm/base.py`) keyed by our lead ID, so a job that runs twice still leaves one CRM record.
+- `CRMPermanentError` (a 4xx) dead-letters at once; `CRMTransientError` retries with backoff, waiting at least its `retry_after`. Up to `CRM_MAX_ATTEMPTS` tries, then the lead is `sync_failed`.
+- v1 ships only the mock adapter, which writes to `mock_crm_records`. To see failures, set `MOCK_CRM_FAIL_RATE`, or create a lead with `"metadata": {"simulate_crm_failure": "unavailable"}` (503), `"rate_limited"` (429) or `"invalid"` (422).
+
 ## Database migrations
 
 ```bash
