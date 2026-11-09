@@ -1,4 +1,4 @@
-"""Creating and reading leads."""
+"""Creating, reading and approving leads."""
 
 import hashlib
 import json
@@ -16,7 +16,7 @@ from app.domain.jobs import JobType
 from app.domain.pagination import decode_cursor, encode_cursor
 from app.domain.status import LeadStatus
 from app.errors import ConflictError
-from app.services.events import record_event
+from app.services.events import SYSTEM_ACTOR, record_event, transition
 from app.worker import queue
 
 
@@ -136,6 +136,20 @@ async def _find_replay(
             "This Idempotency-Key was already used with a different request body."
         )
     return await session.get(Lead, row.lead_id)
+
+
+def approve_lead(
+    session: AsyncSession,
+    lead: Lead,
+    *,
+    sync_max_attempts: int,
+    event_type: str,
+    actor: str = SYSTEM_ACTOR,
+    data: dict[str, Any] | None = None,
+) -> None:
+    """Approve a lead and queue its CRM sync in the same transaction."""
+    transition(session, lead, LeadStatus.APPROVED, event_type=event_type, actor=actor, data=data)
+    queue.enqueue(session, JobType.SYNC_LEAD, lead.id, max_attempts=sync_max_attempts)
 
 
 async def lock_lead(session: AsyncSession, lead_id: str) -> Lead | None:

@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.api.v1.router import api_router
 from app.config import AppEnv, Settings, get_settings
+from app.crm.factory import build_crm_adapter
 from app.db.engine import create_engine, create_sessionmaker, wait_for_database
 from app.errors import ErrorResponse, register_error_handlers
 from app.llm.factory import build_provider
@@ -49,7 +50,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.worker_enabled:
             worker = Worker(
                 app.state.sessionmaker,
-                default_handlers(settings, build_provider(settings)),
+                default_handlers(
+                    settings,
+                    build_provider(settings),
+                    build_crm_adapter(settings, app.state.sessionmaker),
+                ),
                 WorkerConfig.from_settings(settings),
             )
             worker_task = asyncio.create_task(worker.run(stop), name="job-worker")
