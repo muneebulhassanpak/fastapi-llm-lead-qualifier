@@ -33,7 +33,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run mypy app tests
+      - run: uv run mypy app tests scripts
 
   test:
     runs-on: ubuntu-latest
