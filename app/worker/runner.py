@@ -18,7 +18,7 @@ from app.db.models import Job
 from app.domain.jobs import JobStatus, JobType, backoff_seconds
 from app.logging import get_logger
 from app.worker import queue
-from app.worker.handlers import JobHandler, PermanentJobError
+from app.worker.handlers import JobHandler, PermanentJobError, RetryLaterError
 
 log = get_logger(__name__)
 
@@ -161,6 +161,9 @@ class Worker:
                     cap=self._config.backoff_max,
                     rng=self._rng,
                 )
+                if isinstance(error, RetryLaterError):
+                    # Honour the hint, but never wait longer than the normal ceiling.
+                    delay = max(delay, min(error.retry_after, self._config.backoff_max))
                 retry_in = timedelta(seconds=delay)
             failure = queue.fail(job, f"{type(error).__name__}: {error}", retry_in=retry_in)
             if failure.outcome is queue.FailureOutcome.DEAD and handler is not None:
