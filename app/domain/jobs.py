@@ -23,10 +23,11 @@ def backoff_seconds(
     cap: float,
     rng: random.Random | None = None,
 ) -> float:
-    """Delay before retry number `attempt` (1-based): exponential with "full jitter".
+    """Delay before retry number `attempt` (1-based): exponential with "equal jitter".
 
     The ceiling doubles each attempt (base, 2*base, 4*base, ...) up to `cap`, and the actual
-    delay is random below it, so many failing jobs don't all retry at the same moment.
+    delay is random between half the ceiling and the ceiling, so many failing jobs don't all
+    retry at the same moment while every retry still waits at least half the ceiling.
     """
     if attempt < 1:
         raise ValueError("attempt starts at 1")
