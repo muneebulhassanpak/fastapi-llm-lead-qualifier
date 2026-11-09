@@ -38,6 +38,10 @@ OPENAPI_TAGS = [
             "and retry leads that failed."
         ),
     },
+    {
+        "name": "webhooks",
+        "description": "Signed deliveries from outside services (a generic format, or Tally).",
+    },
 ]
 
 
