@@ -18,15 +18,10 @@ from app.llm.base import (
 from app.logging import get_logger
 from app.services import llm_usage
 from app.services.events import record_event, transition
-from app.services.leads import lock_lead
+from app.services.leads import approve_lead, lock_lead
 from app.worker.handlers import JobHandler
 
 log = get_logger(__name__)
-
-_ROUTE_TO_STATUS = {
-    Route.APPROVE: (LeadStatus.APPROVED, "auto_approved"),
-    Route.DISQUALIFY: (LeadStatus.DISQUALIFIED, "auto_disqualified"),
-}
 
 
 class QualifyLeadHandler(JobHandler):
@@ -35,15 +30,24 @@ class QualifyLeadHandler(JobHandler):
     1. lock the lead, mark it `qualifying`, reserve a call against the daily cap, commit;
     2. call the model (one extra try if the output doesn't validate);
     3. store the result and route the lead, committed together with the job's completion.
+       An approved lead gets its CRM sync job in that same transaction.
 
     Transient provider errors propagate, so the job is retried with backoff; when it runs out
     of attempts the lead goes to review. Any other failure sends it to review at once.
     """
 
-    def __init__(self, provider: LLMProvider, thresholds: Thresholds, daily_cap: int) -> None:
+    def __init__(
+        self,
+        provider: LLMProvider,
+        thresholds: Thresholds,
+        *,
+        daily_cap: int,
+        sync_max_attempts: int,
+    ) -> None:
         self._provider = provider
         self._thresholds = thresholds
         self._daily_cap = daily_cap
+        self._sync_max_attempts = sync_max_attempts
 
     async def run(self, session: AsyncSession, job: Job) -> None:
         lead = await lock_lead(session, job.lead_id)
@@ -123,11 +127,18 @@ class QualifyLeadHandler(JobHandler):
             },
         )
         decision = decide(q.score, q.confidence, self._thresholds)
-        if decision.route is Route.REVIEW:
-            _send_to_review(session, lead, decision.review_reason or "review")
-        else:
-            status, event = _ROUTE_TO_STATUS[decision.route]
-            transition(session, lead, status, event_type=event)
+        match decision.route:
+            case Route.APPROVE:
+                approve_lead(
+                    session,
+                    lead,
+                    sync_max_attempts=self._sync_max_attempts,
+                    event_type="auto_approved",
+                )
+            case Route.DISQUALIFY:
+                transition(session, lead, LeadStatus.DISQUALIFIED, event_type="auto_disqualified")
+            case Route.REVIEW:
+                _send_to_review(session, lead, decision.review_reason or "review")
         log.info(
             "lead_qualified",
             lead_id=lead.id,

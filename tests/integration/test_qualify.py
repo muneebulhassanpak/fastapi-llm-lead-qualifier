@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from datetime import timedelta
 
+import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -25,6 +26,7 @@ from app.worker.runner import Worker, WorkerConfig
 from tests.integration.conftest import seed_lead
 
 Sessions = async_sessionmaker[AsyncSession]
+SYNC_MAX_ATTEMPTS = 4
 THRESHOLDS = Thresholds(auto_approve_score=60, disqualify_score=30, min_confidence=0.75)
 CONFIG = WorkerConfig(
     batch_size=10,
@@ -83,7 +85,9 @@ async def _setup(
 
 
 def _worker(sessions: Sessions, provider: LLMProvider, *, daily_cap: int = 100) -> Worker:
-    handler = QualifyLeadHandler(provider, THRESHOLDS, daily_cap)
+    handler = QualifyLeadHandler(
+        provider, THRESHOLDS, daily_cap=daily_cap, sync_max_attempts=SYNC_MAX_ATTEMPTS
+    )
     return Worker(sessions, {JobType.QUALIFY_LEAD: handler}, CONFIG, worker_id="test-worker")
 
 
@@ -369,3 +373,27 @@ async def test_stale_job_out_of_attempts_sends_received_lead_to_review(
         "sent_to_review",
     ]
     assert await _review_reason(committed, lead_id) == "llm_unavailable"
+
+
+async def _sync_jobs(sessions: Sessions, lead_id: str) -> Sequence[Job]:
+    async with sessions() as session:
+        stmt = select(Job).where(Job.lead_id == lead_id, Job.type == JobType.SYNC_LEAD)
+        return (await session.scalars(stmt)).all()
+
+
+async def test_approval_queues_the_crm_sync(committed: Sessions) -> None:
+    _, lead_id = await _setup(committed)
+
+    await _worker(committed, ScriptedProvider(_result(85))).run_once()
+
+    [job] = await _sync_jobs(committed, lead_id)
+    assert (job.status, job.max_attempts) == (JobStatus.QUEUED, SYNC_MAX_ATTEMPTS)
+
+
+@pytest.mark.parametrize("score", [10, 45])
+async def test_other_routes_queue_no_sync(committed: Sessions, score: int) -> None:
+    _, lead_id = await _setup(committed)
+
+    await _worker(committed, ScriptedProvider(_result(score))).run_once()
+
+    assert await _sync_jobs(committed, lead_id) == []
