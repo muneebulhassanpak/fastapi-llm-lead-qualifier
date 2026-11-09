@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.models import Job, Lead
 from app.domain.jobs import JobStatus, JobType
 from app.worker import queue
-from app.worker.handlers import JobHandler, PermanentJobError
+from app.worker.handlers import JobHandler, PermanentJobError, RetryLaterError
 from app.worker.runner import Worker, WorkerConfig
 from tests.integration.conftest import seed_lead
 
@@ -121,6 +121,23 @@ async def test_exhausted_job_is_dead_lettered_once(committed: Sessions) -> None:
 
     assert (await _job(committed, job_id)).status == JobStatus.FAILED
     assert handler.dead_letters == [job_id]
+
+
+@pytest.mark.parametrize(("retry_after", "low", "high"), [(8, 7.5, 8), (600, 9.5, 10)])
+async def test_retry_later_waits_at_least_the_hint_up_to_the_cap(
+    committed: Sessions, retry_after: float, low: float, high: float
+) -> None:
+    job_id, _ = await _setup(committed)
+    handler = RecordingHandler(fail_times=1, error=RetryLaterError("429", retry_after=retry_after))
+
+    await _worker(committed, handler).run_once()
+
+    async with committed() as session:
+        wait = await session.scalar(
+            select(func.extract("epoch", Job.run_after - func.now())).where(Job.id == job_id)
+        )
+    assert wait is not None
+    assert low < float(wait) <= high, "normal backoff here is at most 1 s; cap is 10 s"
 
 
 async def test_permanent_error_skips_retries(committed: Sessions) -> None:
