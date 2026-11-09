@@ -1,0 +1,92 @@
+"""Application settings, loaded from environment variables and `.env`."""
+
+from enum import StrEnum
+from functools import lru_cache
+from typing import Self
+
+from pydantic import Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class AppEnv(StrEnum):
+    DEVELOPMENT = "development"
+    TEST = "test"
+    PRODUCTION = "production"
+
+
+class LLMMode(StrEnum):
+    MOCK = "mock"
+    ANTHROPIC = "anthropic"
+    OPENAI = "openai"
+
+
+class CRMMode(StrEnum):
+    MOCK = "mock"
+    HUBSPOT = "hubspot"
+
+
+class Settings(BaseSettings):
+    """Every setting has a safe local default. Production must set the secrets explicitly."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    app_env: AppEnv = AppEnv.DEVELOPMENT
+    app_version: str = "1.0.0"
+    log_level: str = "INFO"
+
+    database_url: str = "postgresql+asyncpg://leadqual:leadqual@localhost:5433/leadqual"
+
+    api_key_pepper: SecretStr = SecretStr("")
+    webhook_secret_key: SecretStr = SecretStr("")
+
+    worker_enabled: bool = True
+    worker_poll_interval_seconds: float = Field(default=2.0, gt=0)
+    job_lock_timeout_seconds: int = Field(default=300, gt=0)
+
+    llm_mode: LLMMode = LLMMode.MOCK
+    llm_model: str = ""
+    llm_api_key: SecretStr = SecretStr("")
+    llm_timeout_seconds: float = Field(default=30.0, gt=0)
+    llm_daily_cap: int = Field(default=200, ge=0)
+
+    auto_approve_score: int = Field(default=60, ge=0, le=100)
+    disqualify_score: int = Field(default=30, ge=0, le=100)
+    min_confidence: float = Field(default=0.75, ge=0, le=1)
+
+    crm_mode: CRMMode = CRMMode.MOCK
+    crm_max_attempts: int = Field(default=5, ge=1)
+    mock_crm_fail_rate: float = Field(default=0.0, ge=0, le=1)
+    hubspot_access_token: SecretStr = SecretStr("")
+
+    rate_limit_writes_per_minute: int = Field(default=60, gt=0)
+    rate_limit_reads_per_minute: int = Field(default=300, gt=0)
+
+    demo_retention_days: int = Field(default=7, gt=0)
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env is AppEnv.PRODUCTION
+
+    @model_validator(mode="after")
+    def _check_consistency(self) -> Self:
+        if self.disqualify_score >= self.auto_approve_score:
+            raise ValueError("DISQUALIFY_SCORE must be lower than AUTO_APPROVE_SCORE")
+        if self.is_production:
+            missing = [
+                name
+                for name, value in (
+                    ("API_KEY_PEPPER", self.api_key_pepper),
+                    ("WEBHOOK_SECRET_KEY", self.webhook_secret_key),
+                )
+                if not value.get_secret_value()
+            ]
+            if self.llm_mode is not LLMMode.MOCK and not self.llm_api_key.get_secret_value():
+                missing.append("LLM_API_KEY")
+            if missing:
+                raise ValueError(f"Missing required production settings: {', '.join(missing)}")
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

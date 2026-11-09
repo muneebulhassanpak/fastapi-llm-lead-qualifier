@@ -27,5 +27,8 @@ jobs:
             build
           requireScope: false
           subjectPattern: ^[a-z].+[^.]$
+          # Dependabot writes "Bump ..." with a capital letter; its PRs are labelled and skipped here.
+          ignoreLabels: |
+            dependencies
           subjectPatternError: |
             The subject "{subject}" must start with a lowercase letter and must not end with a period.

@@ -12,23 +12,64 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Job ids are referenced by the "Protect main" ruleset as required checks. Do not rename them.
-# The steps are placeholders until Phase 02 adds the application code.
+# Job ids lint, typecheck and test are required checks in the "Protect main" ruleset. Do not rename them.
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "ruff check and ruff format --check are added in Phase 02"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check --output-format=github .
+      - run: uv run ruff format --check .
 
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "mypy --strict is added in Phase 02"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run mypy app tests
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "pytest is added in Phase 02"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest --cov --cov-report=term --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: lead-qualification-api:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test the image
+        run: |
+          docker run -d --name api -p 8000:8000 lead-qualification-api:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:8000/v1/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs api
+          exit 1

@@ -31,4 +31,50 @@ Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `ci`,
 
 ## Local setup
 
-Added in Phase 02, together with the application skeleton.
+Requirements: [uv](https://docs.astral.sh/uv/), Docker, and Python 3.12 (uv can install it).
+
+```bash
+cp .env.example .env          # then fill in any secrets you need
+uv sync                       # create .venv with app + dev dependencies
+uv run pre-commit install     # run ruff and mypy before every commit
+```
+
+Run the whole stack (API + Postgres) in Docker:
+
+```bash
+docker compose up --build
+curl localhost:8000/v1/health
+open http://localhost:8000/docs
+```
+
+Or run the API on your machine with auto-reload:
+
+```bash
+docker compose up -d db
+uv run uvicorn app.main:app --reload
+```
+
+Compose publishes Postgres on host port **5433**, so it doesn't clash with a local Postgres. Change it with `POSTGRES_HOST_PORT`.
+
+## Checks
+
+These are the same commands CI runs:
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy app tests
+uv run pytest --cov
+```
+
+## Code layout
+
+| Path | Holds |
+|---|---|
+| `app/api/` | HTTP only: routers, request/response models, dependencies |
+| `app/services/` | Use cases (create lead, approve, ...) |
+| `app/domain/` | Pure business rules with no I/O (statuses, routing, backoff) |
+| `app/db/` | Engine, session, models |
+| `app/worker/` | Job queue and handlers |
+| `app/llm/`, `app/crm/`, `app/webhooks/` | Adapters for outside systems |
+| `tests/` | `unit/` runs without services; `integration/` needs Postgres |
