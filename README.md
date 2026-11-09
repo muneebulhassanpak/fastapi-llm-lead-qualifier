@@ -9,6 +9,7 @@ FastAPI service that scores sales enquiries with an LLM, routes uncertain ones t
 ```bash
 cp .env.example .env
 docker compose up --build
+docker compose exec api python -m app.cli create-tenant --name "Demo"   # copy the printed key
 ```
 
-Then open http://localhost:8000/docs. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup.
+Then open http://localhost:8000/docs, click **Authorize**, paste the key, and try `POST /v1/leads`. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup.

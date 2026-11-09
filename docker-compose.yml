@@ -9,6 +9,7 @@ services:
     environment:
       # Inside compose the database host is the service name, not localhost.
       DATABASE_URL: postgresql+asyncpg://leadqual:leadqual@db:5432/leadqual
+      RUN_MIGRATIONS: "true"
     depends_on:
       db:
         condition: service_healthy

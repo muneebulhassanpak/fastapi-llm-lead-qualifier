@@ -7,11 +7,16 @@ license = "MIT"
 authors = [{ name = "Muhammad Muneeb-Ul-Hassan" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32.0",
     "fastapi>=0.162.2",
-    "pydantic>=2.14.3",
+    "pydantic[email]>=2.14.3",
     "pydantic-settings>=2.16.2",
+    "python-ulid>=4.1.0",
+    "sqlalchemy[asyncio]>=2.1.8",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
+    "typer>=0.28.0",
 ]
 
 [tool.uv]
@@ -55,6 +60,11 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+# asyncpg ships no type information; only the test suite imports it directly.
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
@@ -63,13 +73,18 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+filterwarnings = ["error"]
 
 [tool.coverage.run]
 source = ["app"]
 branch = true
+# SQLAlchemy's async layer runs database code in greenlets.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
+fail_under = 90
 show_missing = true
 skip_covered = true

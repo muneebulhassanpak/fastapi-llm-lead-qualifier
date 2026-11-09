@@ -51,10 +51,46 @@ Or run the API on your machine with auto-reload:
 
 ```bash
 docker compose up -d db
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
 Compose publishes Postgres on host port **5433**, so it doesn't clash with a local Postgres. Change it with `POSTGRES_HOST_PORT`.
+
+> Commands run on your machine (`uvicorn`, `alembic`, the CLI) use `DATABASE_URL` from `.env`. If that points at a hosted database such as Neon, they act on it. `docker compose` always uses its own database container.
+
+## Tenants and API keys
+
+Tenants and keys are created from the command line, never through the API:
+
+```bash
+uv run python -m app.cli create-tenant --name "Acme"      # prints the key once
+uv run python -m app.cli create-key --tenant tn_...
+uv run python -m app.cli revoke-key --prefix ab12cd34
+uv run python -m app.cli list-tenants
+
+# inside the compose stack
+docker compose exec api python -m app.cli create-tenant --name "Acme"
+```
+
+Keys are stored as an HMAC-SHA256 hash keyed with `API_KEY_PEPPER`. Changing the pepper invalidates every existing key.
+
+## Database migrations
+
+```bash
+uv run alembic revision --autogenerate -m "add jobs table"   # then read and edit the file
+uv run alembic upgrade head
+uv run alembic check          # fails if models changed without a migration
+```
+
+Rules (CI enforces the first three):
+
+1. Every model change ships with a migration in the same PR. CI runs `alembic check`.
+2. Every migration has a working `downgrade`. CI runs upgrade → downgrade → upgrade on an empty database.
+3. There is exactly one head. If two PRs both add a migration, the second one rebases and runs `alembic merge` (or re-parents its migration).
+4. Never edit a migration that is already on `main`. Add a new one.
+5. The running version must keep working on the new schema, because it serves traffic while the new version starts. Add columns as nullable or with a default; remove columns in a later release.
+6. Migrations that change data must be safe to run twice.
 
 ## Checks
 
@@ -64,8 +100,10 @@ These are the same commands CI runs:
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy app tests
-uv run pytest --cov
+uv run pytest --cov            # needs the db container: docker compose up -d db
 ```
+
+Integration tests create a fresh `leadqual_test` database on every run (`TEST_DATABASE_URL`) and roll back each test's changes. They never use `DATABASE_URL`. Coverage below 90% fails the run, and so does any warning.
 
 ## Code layout
 

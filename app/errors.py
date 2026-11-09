@@ -41,6 +41,26 @@ class AppError(Exception):
         self.details = details
 
 
+class UnauthorizedError(AppError):
+    status_code = HTTPStatus.UNAUTHORIZED
+    code = "unauthorized"
+
+
+class NotFoundError(AppError):
+    status_code = HTTPStatus.NOT_FOUND
+    code = "not_found"
+
+
+class ConflictError(AppError):
+    status_code = HTTPStatus.CONFLICT
+    code = "conflict"
+
+
+class BadRequestError(AppError):
+    status_code = HTTPStatus.BAD_REQUEST
+    code = "bad_request"
+
+
 def _code_for_status(status_code: int) -> str:
     try:
         return HTTPStatus(status_code).phrase.lower().replace(" ", "_").replace("-", "_")
@@ -74,7 +94,10 @@ def error_response(
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
-        return error_response(request, exc.status_code, exc.code, exc.message, exc.details)
+        headers = {"WWW-Authenticate": "ApiKey"} if isinstance(exc, UnauthorizedError) else None
+        return error_response(
+            request, exc.status_code, exc.code, exc.message, exc.details, headers=headers
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
