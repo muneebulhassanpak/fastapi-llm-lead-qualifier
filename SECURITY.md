@@ -4,7 +4,7 @@
 
 Please do not open a public issue for security problems.
 
-Report them privately through [GitHub private vulnerability reporting](https://github.com/muneebulhassanpak/lead-qualification-api/security/advisories/new). Include steps to reproduce and the impact you expect.
+Report them privately through [GitHub private vulnerability reporting](https://github.com/muneebulhassanpak/fastapi-llm-lead-qualifier/security/advisories/new). Include steps to reproduce and the impact you expect.
 
 You can expect an acknowledgement within a few days.
 

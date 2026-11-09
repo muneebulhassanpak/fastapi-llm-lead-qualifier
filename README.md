@@ -1,6 +1,6 @@
-# Lead Qualification API
+# FastAPI LLM Lead Qualifier
 
-[![CI](https://github.com/muneebulhassanpak/lead-qualification-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/muneebulhassanpak/lead-qualification-api/actions/workflows/ci.yml)
+[![CI](https://github.com/muneebulhassanpak/fastapi-llm-lead-qualifier/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/muneebulhassanpak/fastapi-llm-lead-qualifier/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/website?url=https://lead-qualification-api-h4sy.onrender.com%2Fv1%2Fhealth&label=live%20demo&up_message=up&down_message=down)](https://lead-qualification-api-h4sy.onrender.com/docs)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![Coverage 98%](https://img.shields.io/badge/coverage-98%25-brightgreen)
