@@ -50,6 +50,12 @@ class LLMRefusalError(LLMError):
     code = "llm_refused"
 
 
+class LLMRejectedError(LLMError):
+    """The provider rejected the request (bad request, auth, permissions): retrying won't help."""
+
+    code = "llm_request_rejected"
+
+
 class LLMProvider(Protocol):
     name: str
 
