@@ -12,10 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import IdempotencyKey, Lead
+from app.domain.jobs import JobType
 from app.domain.pagination import decode_cursor, encode_cursor
 from app.domain.status import LeadStatus
 from app.errors import ConflictError
 from app.services.events import record_event
+from app.worker import queue
 
 
 @dataclass(frozen=True)
@@ -64,8 +66,9 @@ async def create_lead(
     actor: str,
     idempotency_key: str | None = None,
     idempotency_ttl: timedelta = timedelta(hours=24),
+    job_max_attempts: int = 5,
 ) -> CreateResult:
-    """Store a lead and its `received` event.
+    """Store a lead, its `received` event and its qualification job, in one transaction.
 
     With an idempotency key, a repeat of the same request returns the original lead instead
     of creating a second one, and reusing the key for a different request is a conflict.
@@ -90,6 +93,7 @@ async def create_lead(
     session.add(lead)
     await session.flush()
     record_event(session, lead, "received", actor=actor, data={"source": new.source})
+    queue.enqueue(session, JobType.QUALIFY_LEAD, lead.id, max_attempts=job_max_attempts)
     if idempotency_key is not None:
         session.add(
             IdempotencyKey(

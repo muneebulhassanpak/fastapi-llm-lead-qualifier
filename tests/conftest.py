@@ -18,6 +18,7 @@ def settings() -> Settings:
         _env_file=None,
         app_env=AppEnv.TEST,
         app_version="9.9.9",
+        worker_enabled=False,
         database_url=UNREACHABLE_DATABASE_URL,
         api_key_pepper=SecretStr("test-pepper"),
     )

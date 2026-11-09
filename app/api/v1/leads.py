@@ -67,6 +67,7 @@ async def create_lead(
         actor=caller.actor,
         idempotency_key=idempotency_key,
         idempotency_ttl=timedelta(hours=settings.idempotency_ttl_hours),
+        job_max_attempts=settings.job_max_attempts,
     )
     if result.replayed:
         response.status_code = status.HTTP_200_OK

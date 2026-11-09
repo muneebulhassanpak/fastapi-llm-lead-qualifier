@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import IdempotencyKey, Lead, LeadEvent
+from app.db.models import IdempotencyKey, Job, Lead, LeadEvent
 from app.services import leads as lead_service
 from tests.integration.conftest import MakeTenant, TenantWithKey
 
@@ -175,3 +175,16 @@ async def test_concurrent_duplicate_returns_the_winner(
     assert loser.replayed
     assert loser.lead.id == winner.lead.id
     assert await _count_leads(db_session) == 1
+
+
+async def test_create_queues_one_qualification_job(
+    client: AsyncClient, acme: TenantWithKey, db_session: AsyncSession
+) -> None:
+    headers = {**acme.headers, "Idempotency-Key": "job-check"}
+    lead_id = (await client.post("/v1/leads", json=ENQUIRY, headers=headers)).json()["id"]
+    await client.post("/v1/leads", json=ENQUIRY, headers=headers)  # replay adds no job
+
+    jobs = list(await db_session.scalars(select(Job).where(Job.lead_id == lead_id)))
+    assert [(job.type, job.status, job.max_attempts) for job in jobs] == [
+        ("qualify_lead", "queued", 5)
+    ]

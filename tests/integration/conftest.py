@@ -93,6 +93,7 @@ def settings(migrated_database_url: str) -> Settings:
         _env_file=None,
         app_env=AppEnv.TEST,
         app_version="9.9.9",
+        worker_enabled=False,
         database_url=migrated_database_url,
         api_key_pepper=SecretStr(PEPPER),
     )
