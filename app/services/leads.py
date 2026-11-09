@@ -138,6 +138,11 @@ async def _find_replay(
     return await session.get(Lead, row.lead_id)
 
 
+async def lock_lead(session: AsyncSession, lead_id: str) -> Lead | None:
+    """Load a lead fresh from the database and lock its row until the transaction ends."""
+    return await session.get(Lead, lead_id, with_for_update=True, populate_existing=True)
+
+
 async def get_lead(session: AsyncSession, tenant_id: str, lead_id: str) -> Lead | None:
     """A lead with its events, only if it belongs to the tenant."""
     return await session.scalar(

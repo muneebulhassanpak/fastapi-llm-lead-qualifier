@@ -18,6 +18,7 @@ from app.llm.base import (
 from app.logging import get_logger
 from app.services import llm_usage
 from app.services.events import record_event, transition
+from app.services.leads import lock_lead
 from app.worker.handlers import JobHandler
 
 log = get_logger(__name__)
@@ -45,7 +46,7 @@ class QualifyLeadHandler(JobHandler):
         self._daily_cap = daily_cap
 
     async def run(self, session: AsyncSession, job: Job) -> None:
-        lead = await _lock_lead(session, job.lead_id)
+        lead = await lock_lead(session, job.lead_id)
         if lead is None or lead.status not in (LeadStatus.RECEIVED, LeadStatus.QUALIFYING):
             return  # deleted, or already handled by an earlier run: nothing to do
 
@@ -65,7 +66,7 @@ class QualifyLeadHandler(JobHandler):
         except LLMTransientError:
             raise
         except LLMError as exc:
-            lead = await _lock_lead(session, job.lead_id)
+            lead = await lock_lead(session, job.lead_id)
             if lead is not None and lead.status == LeadStatus.QUALIFYING:
                 _send_to_review(session, lead, exc.code, detail=str(exc))
             return
@@ -73,13 +74,13 @@ class QualifyLeadHandler(JobHandler):
         await llm_usage.record_tokens(
             session, tenant_id, day, result.input_tokens, result.output_tokens
         )
-        lead = await _lock_lead(session, job.lead_id)
+        lead = await lock_lead(session, job.lead_id)
         if lead is None or lead.status != LeadStatus.QUALIFYING:
             return  # changed while the model was running; keep what is there
         self._apply(session, lead, result)
 
     async def on_dead_letter(self, session: AsyncSession, job: Job) -> None:
-        lead = await _lock_lead(session, job.lead_id)
+        lead = await lock_lead(session, job.lead_id)
         if lead is None:
             return
         if lead.status == LeadStatus.RECEIVED:
@@ -142,10 +143,6 @@ class QualifyLeadHandler(JobHandler):
 
 def _today() -> date:
     return datetime.now(UTC).date()
-
-
-async def _lock_lead(session: AsyncSession, lead_id: str) -> Lead | None:
-    return await session.get(Lead, lead_id, with_for_update=True, populate_existing=True)
 
 
 def _send_to_review(
