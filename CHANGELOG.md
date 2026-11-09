@@ -37,3 +37,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Per-key rate limits for reads and writes, and per-endpoint limits for webhooks, with `X-RateLimit-*` headers and `429` plus `Retry-After`.
 - `GET /v1/stats` with lead counts by status and source and the average score, and an opt-in cleanup (`DEMO_RETENTION_DAYS`, or the `cleanup` CLI command) that deletes old demo data.
 - Deployment as code: a Render Blueprint (`render.yaml`) for a free Docker service next to Neon, deploying from `main` after CI passes, with demo-safe limits; `docs/deploy.md`; and `scripts/seed_demo.py`, which adds sample leads (kept by cleanup) to the demo tenant.
+- A public demo on Render, linked from the README with a public demo key, plus CI and live-status badges.
