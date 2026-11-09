@@ -17,11 +17,15 @@ from app.services import webhooks as webhook_service
 from app.webhooks.base import InvalidPayloadError, WebhookAdapter
 from app.webhooks.generic import GenericAdapter
 from app.webhooks.secrets import decrypt_secret
+from app.webhooks.tally import TallyAdapter
 
 MAX_BODY_BYTES = 64 * 1024
+# Longer than API idempotency: Tally keeps retrying a failed delivery for about 31 hours.
+DEDUP_WINDOW = timedelta(hours=72)
 
 ADAPTERS: Mapping[WebhookProvider, WebhookAdapter] = {
     WebhookProvider.GENERIC: GenericAdapter(),
+    WebhookProvider.TALLY: TallyAdapter(),
 }
 
 
@@ -92,7 +96,7 @@ async def receive_webhook(
         inbound.lead,
         actor=f"webhook:{endpoint.id}",
         idempotency_key=f"webhook:{endpoint.id}:{inbound.event_id}",
-        idempotency_ttl=timedelta(hours=settings.idempotency_ttl_hours),
+        idempotency_ttl=DEDUP_WINDOW,
         job_max_attempts=settings.job_max_attempts,
     )
     if result.replayed:
