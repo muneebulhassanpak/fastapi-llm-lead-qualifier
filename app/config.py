@@ -24,7 +24,6 @@ class LLMMode(StrEnum):
 
 class CRMMode(StrEnum):
     MOCK = "mock"
-    HUBSPOT = "hubspot"
 
 
 class Settings(BaseSettings):
@@ -64,7 +63,6 @@ class Settings(BaseSettings):
     crm_mode: CRMMode = CRMMode.MOCK
     crm_max_attempts: int = Field(default=5, ge=1)
     mock_crm_fail_rate: float = Field(default=0.0, ge=0, le=1)
-    hubspot_access_token: SecretStr = SecretStr("")
 
     rate_limit_writes_per_minute: int = Field(default=60, gt=0)
     rate_limit_reads_per_minute: int = Field(default=300, gt=0)
