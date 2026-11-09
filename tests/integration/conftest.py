@@ -174,11 +174,23 @@ async def committed(engine: AsyncEngine) -> AsyncIterator[async_sessionmaker[Asy
         await conn.execute(text(f"TRUNCATE {tables} CASCADE"))
 
 
-async def seed_lead(sessionmaker: async_sessionmaker[AsyncSession], message: str = "Hi") -> Lead:
+async def seed_lead(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    message: str = "Hi",
+    *,
+    status: LeadStatus = LeadStatus.RECEIVED,
+    metadata: dict[str, Any] | None = None,
+) -> Lead:
     """A committed tenant and lead to hang jobs on."""
     async with sessionmaker() as session:
         tenant = await tenant_service.create_tenant(session, "Queue Co")
-        lead = Lead(tenant_id=tenant.id, status=LeadStatus.RECEIVED, source="api", message=message)
+        lead = Lead(
+            tenant_id=tenant.id,
+            status=status,
+            source="api",
+            message=message,
+            extra_metadata=metadata or {},
+        )
         session.add(lead)
         await session.commit()
         return lead
