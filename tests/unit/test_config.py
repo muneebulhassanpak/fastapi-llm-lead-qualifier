@@ -41,3 +41,11 @@ def test_production_with_secrets_is_valid() -> None:
 def test_thresholds_must_be_ordered() -> None:
     with pytest.raises(ValidationError, match="DISQUALIFY_SCORE"):
         Settings(_env_file=None, auto_approve_score=30, disqualify_score=30)
+
+
+def test_demo_cleanup_is_off_unless_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert Settings(_env_file=None).demo_retention_days is None
+    monkeypatch.setenv("DEMO_RETENTION_DAYS", "")
+    assert Settings(_env_file=None).demo_retention_days is None
+    monkeypatch.setenv("DEMO_RETENTION_DAYS", "7")
+    assert Settings(_env_file=None).demo_retention_days == 7

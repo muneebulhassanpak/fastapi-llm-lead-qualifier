@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from fastapi import FastAPI
 
@@ -15,6 +16,7 @@ from app.llm.factory import build_provider
 from app.logging import configure_logging, get_logger
 from app.middleware import RequestContextMiddleware
 from app.ratelimit import SlidingWindowLimiter
+from app.worker.cleanup import run_cleanup
 from app.worker.registry import default_handlers
 from app.worker.runner import Worker, WorkerConfig
 
@@ -72,8 +74,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
             worker_task = asyncio.create_task(worker.run(stop), name="job-worker")
         app.state.worker_task = worker_task
+        cleanup_task: asyncio.Task[None] | None = None
+        if settings.worker_enabled and settings.demo_retention_days:
+            retention = timedelta(days=settings.demo_retention_days)
+            cleanup_task = asyncio.create_task(
+                run_cleanup(app.state.sessionmaker, retention, stop), name="cleanup"
+            )
+        app.state.cleanup_task = cleanup_task
         yield
         stop.set()
+        if cleanup_task is not None:
+            await cleanup_task
         if worker_task is not None:
             try:
                 # Let the job in progress finish; its lock times out and it re-runs otherwise.

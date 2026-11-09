@@ -5,10 +5,12 @@ python -m app.cli create-key --tenant tn_...
 python -m app.cli revoke-key --prefix ab12cd34
 python -m app.cli create-webhook --tenant tn_... --provider tally
 python -m app.cli revoke-webhook --id whk_...
+python -m app.cli cleanup --older-than-days 7
 """
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import typer
@@ -21,6 +23,7 @@ from app.db.models import Tenant
 from app.db.models.webhook import WebhookProvider
 from app.services import tenants as tenant_service
 from app.services import webhooks as webhook_service
+from app.services.cleanup import CleanupResult, delete_old_data
 from app.services.webhooks import CreatedEndpoint
 from app.webhooks.secrets import SecretKeyMissingError
 
@@ -126,6 +129,23 @@ def revoke_webhook(endpoint_id: Annotated[str, typer.Option("--id", help="Endpoi
         typer.secho(f"No active webhook endpoint {endpoint_id}.", fg="red", err=True)
         raise typer.Exit(1)
     typer.echo(f"Revoked webhook endpoint {endpoint_id}.")
+
+
+@cli.command("cleanup")
+def cleanup(
+    older_than_days: Annotated[int, typer.Option(min=1, help="Delete leads older than this.")],
+    yes: Annotated[bool, typer.Option("--yes", help="Don't ask for confirmation.")] = False,
+) -> None:
+    """Delete leads (with their history) and mock CRM records older than N days."""
+    if not yes:
+        typer.confirm(f"Delete every lead older than {older_than_days} days?", abort=True)
+    cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
+
+    async def work(session: AsyncSession) -> CleanupResult:
+        return await delete_old_data(session, cutoff)
+
+    result = _run(work)
+    typer.echo(f"Deleted {result.leads} leads and {result.crm_records} mock CRM records.")
 
 
 @cli.command("list-tenants")
