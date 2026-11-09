@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.models import Job, Lead, LeadEvent, MockCrmRecord, SyncAttempt
 from app.domain.jobs import JobType
 from app.services import cleanup
-from app.services.events import record_event
+from app.services.events import SEED_ACTOR, record_event
 from app.worker import queue
 from app.worker.cleanup import run_cleanup
 from tests.integration.conftest import seed_lead
@@ -115,3 +115,17 @@ async def test_loop_survives_a_failed_run(
     await asyncio.wait_for(task, timeout=2)
 
     assert calls >= 2
+
+
+async def test_seeded_demo_leads_are_kept(committed: Sessions) -> None:
+    lead = await seed_lead(committed)
+    async with committed() as session:
+        record_event(session, lead, "received", actor=SEED_ACTOR)
+        await session.execute(update(Lead).where(Lead.id == lead.id).values(created_at=OLD))
+        await session.commit()
+
+    async with committed() as session:
+        result = await cleanup.delete_old_data(session, datetime.now(UTC) - timedelta(days=7))
+
+    assert result.leads == 0
+    assert await _count(committed, Lead) == 1

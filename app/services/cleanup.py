@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, Delete, delete, select
+from sqlalchemy import CursorResult, Delete, delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Lead, MockCrmRecord
+from app.db.models import Lead, LeadEvent, MockCrmRecord
+from app.services.events import SEED_ACTOR
 
 BATCH_SIZE = 500
 
@@ -21,10 +22,16 @@ class CleanupResult:
 async def delete_old_data(session: AsyncSession, older_than: datetime) -> CleanupResult:
     """Delete leads created before `older_than`, with everything that hangs off them (events,
     jobs, sync attempts, idempotency keys go by cascade), and mock CRM records as old.
+    The demo's seeded sample leads are kept, so the demo never ends up empty.
 
     Works in batches, committing each, so no single transaction locks many rows for long.
     """
-    old_leads = select(Lead.id).where(Lead.created_at < older_than).limit(BATCH_SIZE)
+    seeded = exists().where(
+        LeadEvent.lead_id == Lead.id,
+        LeadEvent.type == "received",
+        LeadEvent.actor == SEED_ACTOR,
+    )
+    old_leads = select(Lead.id).where(Lead.created_at < older_than, ~seeded).limit(BATCH_SIZE)
     old_records = (
         select(MockCrmRecord.id).where(MockCrmRecord.created_at < older_than).limit(BATCH_SIZE)
     )
