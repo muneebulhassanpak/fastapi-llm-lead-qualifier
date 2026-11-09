@@ -1,14 +1,8 @@
-"""Job handler interface and the handlers registered by default."""
-
-from collections.abc import Mapping
+"""The job handler interface."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Job
-from app.domain.jobs import JobType
-from app.logging import get_logger
-
-log = get_logger(__name__)
 
 
 class PermanentJobError(Exception):
@@ -29,14 +23,3 @@ class JobHandler:
 
     async def on_dead_letter(self, session: AsyncSession, job: Job) -> None:
         """Called once, in the transaction that marks the job failed for good."""
-
-
-class PendingQualificationHandler(JobHandler):
-    """Placeholder until the LLM qualifier lands (Phase 05): leaves the lead in `received`."""
-
-    async def run(self, session: AsyncSession, job: Job) -> None:
-        log.info("qualification_pending", lead_id=job.lead_id)
-
-
-def default_handlers() -> Mapping[JobType, JobHandler]:
-    return {JobType.QUALIFY_LEAD: PendingQualificationHandler()}

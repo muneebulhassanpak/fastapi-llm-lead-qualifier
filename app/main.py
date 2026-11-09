@@ -10,9 +10,10 @@ from app.api.v1.router import api_router
 from app.config import AppEnv, Settings, get_settings
 from app.db.engine import create_engine, create_sessionmaker, wait_for_database
 from app.errors import ErrorResponse, register_error_handlers
+from app.llm.factory import build_provider
 from app.logging import configure_logging, get_logger
 from app.middleware import RequestContextMiddleware
-from app.worker.handlers import default_handlers
+from app.worker.registry import default_handlers
 from app.worker.runner import Worker, WorkerConfig
 
 WORKER_SHUTDOWN_TIMEOUT_SECONDS = 20
@@ -47,7 +48,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         worker_task: asyncio.Task[None] | None = None
         if settings.worker_enabled:
             worker = Worker(
-                app.state.sessionmaker, default_handlers(), WorkerConfig.from_settings(settings)
+                app.state.sessionmaker,
+                default_handlers(settings, build_provider(settings)),
+                WorkerConfig.from_settings(settings),
             )
             worker_task = asyncio.create_task(worker.run(stop), name="job-worker")
         app.state.worker_task = worker_task
