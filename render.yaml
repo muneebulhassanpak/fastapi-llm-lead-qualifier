@@ -1,0 +1,52 @@
+# Render Blueprint for the public demo: https://render.com/docs/blueprint-spec
+# Secrets are `sync: false`: Render asks for them once, in the dashboard, and they never
+# live in this file. See docs/deploy.md.
+services:
+  - type: web
+    name: lead-qualification-api
+    runtime: docker
+    plan: free
+    # Same region as the Neon database (AWS ap-southeast-1).
+    region: singapore
+    branch: main
+    # Deploy a commit on main only once its CI checks have passed.
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # The free plan has no pre-deploy step, so migrations run when the container starts.
+      # If one fails the new version never becomes healthy and the old one keeps serving.
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: WORKER_ENABLED
+        value: "true"
+      - key: LLM_MODE
+        value: anthropic
+      - key: LLM_TIMEOUT_SECONDS
+        value: "30"
+      # Demo safety: few model calls per tenant per day, tight per-key limits, and
+      # visitors' leads deleted after a week (the seeded samples are kept).
+      - key: LLM_DAILY_CAP
+        value: "50"
+      - key: RATE_LIMIT_WRITES_PER_MINUTE
+        value: "20"
+      - key: RATE_LIMIT_READS_PER_MINUTE
+        value: "120"
+      - key: DEMO_RETENTION_DAYS
+        value: "7"
+      - key: CRM_MODE
+        value: mock
+      # Secrets: entered in the Render dashboard.
+      - key: DATABASE_URL
+        sync: false
+      - key: API_KEY_PEPPER
+        sync: false
+      - key: WEBHOOK_SECRET_KEY
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
