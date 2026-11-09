@@ -29,3 +29,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - LLM qualification: each new lead is scored by Anthropic (default `claude-haiku-5-5`), OpenAI or an offline mock provider using structured outputs, then auto-approved, disqualified or sent to review with a recorded reason.
 - A versioned prompt that keeps lead text out of the instructions, and opt-in live tests (`pytest -m live_llm`) including prompt-injection attempts.
 - A per-tenant daily cap on model calls, with token usage recorded per tenant and day.
+- CRM sync: approved leads are pushed to the CRM by a background job, with one row per attempt, retries with backoff (respecting `Retry-After`), and `sync_failed` when attempts run out. Upserts are keyed by our lead ID, so retries never duplicate a record.
+- A mock CRM that can fail on purpose (a fail rate, or a per-lead 503, 429 or 422) to show the retry path.
+- `GET /v1/leads/{id}` shows the CRM provider, external ID, attempt count and last error.
