@@ -32,3 +32,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - CRM sync: approved leads are pushed to the CRM by a background job, with one row per attempt, retries with backoff (respecting `Retry-After`), and `sync_failed` when attempts run out. Upserts are keyed by our lead ID, so retries never duplicate a record.
 - A mock CRM that can fail on purpose (a fail rate, or a per-lead 503, 429 or 422) to show the retry path.
 - `GET /v1/leads/{id}` shows the CRM provider, external ID, attempt count and last error.
+- Review endpoints: `POST /v1/leads/{id}/approve` (optional note and score override) and `/reject` for leads in `needs_review`, and `/retry` to re-sync a `sync_failed` lead or re-qualify one the model failed on. Every action is audited with the caller's key; concurrent actions on one lead give one success and a `409` with the current status.
