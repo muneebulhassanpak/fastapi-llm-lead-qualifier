@@ -8,6 +8,8 @@ from app.db.models import Lead, LeadEvent
 from app.domain.status import LeadStatus, check_transition
 
 SYSTEM_ACTOR = "system"
+# Sample leads from scripts/seed_demo.py. Only server-side code can set an actor.
+SEED_ACTOR = "seed"
 
 
 def api_key_actor(prefix: str) -> str:
