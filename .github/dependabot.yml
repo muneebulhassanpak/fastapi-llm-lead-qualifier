@@ -1,0 +1,13 @@
+# Python (uv) and Docker ecosystems are added in Phase 02, once pyproject.toml and the Dockerfile exist.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area: ci"]
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
