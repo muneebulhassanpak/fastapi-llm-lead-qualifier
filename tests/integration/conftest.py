@@ -87,6 +87,9 @@ async def db_session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
             await outer.rollback()
 
 
+WEBHOOK_SERVER_KEY = "test-webhook-server-key"
+
+
 @pytest.fixture
 def settings(migrated_database_url: str) -> Settings:
     return Settings(
@@ -96,6 +99,7 @@ def settings(migrated_database_url: str) -> Settings:
         worker_enabled=False,
         database_url=migrated_database_url,
         api_key_pepper=SecretStr(PEPPER),
+        webhook_secret_key=SecretStr(WEBHOOK_SERVER_KEY),
     )
 
 
