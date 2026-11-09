@@ -45,7 +45,11 @@ class Settings(BaseSettings):
 
     worker_enabled: bool = True
     worker_poll_interval_seconds: float = Field(default=2.0, gt=0)
+    worker_batch_size: int = Field(default=5, ge=1, le=100)
     job_lock_timeout_seconds: int = Field(default=300, gt=0)
+    job_max_attempts: int = Field(default=5, ge=1)
+    job_backoff_base_seconds: float = Field(default=5.0, gt=0)
+    job_backoff_max_seconds: float = Field(default=600.0, gt=0)
 
     llm_mode: LLMMode = LLMMode.MOCK
     llm_model: str = ""
