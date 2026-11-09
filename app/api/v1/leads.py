@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, Query, Response, status
 
-from app.api.deps import CallerDep, SessionDep, SettingsDep
+from app.api.deps import ReaderDep, SessionDep, SettingsDep, WriterDep
 from app.api.v1.schemas import LeadAccepted, LeadCreate, LeadDetail, LeadList, LeadSummary
 from app.domain.pagination import InvalidCursorError
 from app.domain.status import LeadStatus
@@ -13,7 +13,10 @@ from app.services import leads as lead_service
 router = APIRouter(
     prefix="/leads",
     tags=["leads"],
-    responses={401: {"model": ErrorResponse, "description": "Missing or invalid API key"}},
+    responses={
+        401: {"model": ErrorResponse, "description": "Missing or invalid API key"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded; see Retry-After"},
+    },
 )
 
 IdempotencyKeyHeader = Annotated[
@@ -49,7 +52,7 @@ IdempotencyKeyHeader = Annotated[
 async def create_lead(
     body: LeadCreate,
     response: Response,
-    caller: CallerDep,
+    caller: WriterDep,
     session: SessionDep,
     settings: SettingsDep,
     idempotency_key: IdempotencyKeyHeader = None,
@@ -84,7 +87,7 @@ async def create_lead(
     responses={400: {"model": ErrorResponse, "description": "Invalid cursor"}},
 )
 async def list_leads(
-    caller: CallerDep,
+    caller: ReaderDep,
     session: SessionDep,
     lead_status: Annotated[LeadStatus | None, Query(alias="status")] = None,
     source: Annotated[str | None, Query(max_length=50)] = None,
@@ -116,7 +119,7 @@ async def list_leads(
     description="The full record: original enquiry, score, decision, CRM state and audit trail.",
     responses={404: {"model": ErrorResponse, "description": "No such lead for this tenant"}},
 )
-async def get_lead(lead_id: str, caller: CallerDep, session: SessionDep) -> LeadDetail:
+async def get_lead(lead_id: str, caller: ReaderDep, session: SessionDep) -> LeadDetail:
     lead = await lead_service.get_lead(session, caller.tenant.id, lead_id)
     if lead is None:
         raise NotFoundError("Lead not found.")

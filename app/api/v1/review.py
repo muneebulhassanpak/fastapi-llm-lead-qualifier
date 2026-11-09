@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body
 
-from app.api.deps import CallerDep, SessionDep, SettingsDep
+from app.api.deps import SessionDep, SettingsDep, WriterDep
 from app.api.v1.schemas import ApproveRequest, LeadDetail, RejectRequest
 from app.errors import ErrorResponse, NotFoundError
 from app.services import leads as lead_service
@@ -17,6 +17,7 @@ router = APIRouter(
         401: {"model": ErrorResponse, "description": "Missing or invalid API key"},
         404: {"model": ErrorResponse, "description": "No such lead for this tenant"},
         409: {"model": ErrorResponse, "description": "Not allowed in the lead's current status"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded; see Retry-After"},
     },
 )
 
@@ -38,7 +39,7 @@ async def _detail(session: SessionDep, tenant_id: str, lead_id: str) -> LeadDeta
 )
 async def approve_lead(
     lead_id: str,
-    caller: CallerDep,
+    caller: WriterDep,
     session: SessionDep,
     settings: SettingsDep,
     body: Annotated[ApproveRequest | None, Body()] = None,
@@ -63,7 +64,7 @@ async def approve_lead(
 )
 async def reject_lead(
     lead_id: str,
-    caller: CallerDep,
+    caller: WriterDep,
     session: SessionDep,
     body: Annotated[RejectRequest | None, Body()] = None,
 ) -> LeadDetail:
@@ -86,7 +87,7 @@ async def reject_lead(
     ),
 )
 async def retry_lead(
-    lead_id: str, caller: CallerDep, session: SessionDep, settings: SettingsDep
+    lead_id: str, caller: WriterDep, session: SessionDep, settings: SettingsDep
 ) -> LeadDetail:
     await review.retry(
         session,
