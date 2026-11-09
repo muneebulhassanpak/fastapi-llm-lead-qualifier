@@ -136,6 +136,12 @@ Every API key has a per-minute limit for reads (`RATE_LIMIT_READS_PER_MINUTE`) a
 
 Counts are kept in memory over a sliding window, per process. With several instances, each counts separately; scaling out would mean moving the counters to Redis or Postgres.
 
+## Stats and demo cleanup
+
+`GET /v1/stats?days=7` gives the calling tenant's lead counts by status and source and the average score.
+
+For a public demo, set `DEMO_RETENTION_DAYS` to have the app delete older leads (with their history) and mock CRM records, at startup and then hourly. It is off when unset. To do it once by hand: `uv run python -m app.cli cleanup --older-than-days 7`.
+
 ## Database migrations
 
 ```bash
