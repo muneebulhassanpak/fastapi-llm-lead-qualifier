@@ -137,7 +137,7 @@ These are the same commands CI runs:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy app tests
+uv run mypy app tests scripts
 uv run pytest --cov            # needs the db container: docker compose up -d db
 ```
 
