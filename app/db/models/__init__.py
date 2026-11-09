@@ -5,6 +5,7 @@ from app.db.models.job import Job
 from app.db.models.lead import IdempotencyKey, Lead, LeadEvent
 from app.db.models.llm_usage import LlmUsage
 from app.db.models.tenant import ApiKey, Tenant
+from app.db.models.webhook import WebhookEndpoint
 
 __all__ = [
     "ApiKey",
@@ -16,4 +17,5 @@ __all__ = [
     "MockCrmRecord",
     "SyncAttempt",
     "Tenant",
+    "WebhookEndpoint",
 ]
