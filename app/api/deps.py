@@ -4,13 +4,14 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Annotated, cast
 
-from fastapi import Depends, Request, Security
+from fastapi import Depends, Request, Response, Security
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.db.models import Tenant
-from app.errors import UnauthorizedError
+from app.errors import RateLimitedError, UnauthorizedError
+from app.ratelimit import SlidingWindowLimiter
 from app.services.events import api_key_actor
 from app.services.tenants import authenticate
 
@@ -66,3 +67,43 @@ async def get_caller(
 
 
 CallerDep = Annotated[Caller, Depends(get_caller)]
+
+
+def get_rate_limiter(request: Request) -> SlidingWindowLimiter:
+    return cast(SlidingWindowLimiter, request.app.state.rate_limiter)
+
+
+RateLimiterDep = Annotated[SlidingWindowLimiter, Depends(get_rate_limiter)]
+
+
+def enforce_rate_limit(
+    limiter: SlidingWindowLimiter, key: str, limit: int, response: Response
+) -> None:
+    """Count one request against `key`; 429 with Retry-After if it is over the limit."""
+    result = limiter.hit(key, limit)
+    if not result.allowed:
+        raise RateLimitedError(
+            f"Rate limit of {limit} requests per minute exceeded.", headers=result.headers()
+        )
+    response.headers.update(result.headers())
+
+
+async def get_reader(
+    caller: CallerDep, settings: SettingsDep, limiter: RateLimiterDep, response: Response
+) -> Caller:
+    limit = settings.rate_limit_reads_per_minute
+    enforce_rate_limit(limiter, f"read:{caller.key_prefix}", limit, response)
+    return caller
+
+
+async def get_writer(
+    caller: CallerDep, settings: SettingsDep, limiter: RateLimiterDep, response: Response
+) -> Caller:
+    limit = settings.rate_limit_writes_per_minute
+    enforce_rate_limit(limiter, f"write:{caller.key_prefix}", limit, response)
+    return caller
+
+
+# Authenticated callers, counted against their key's read or write limit.
+ReaderDep = Annotated[Caller, Depends(get_reader)]
+WriterDep = Annotated[Caller, Depends(get_writer)]

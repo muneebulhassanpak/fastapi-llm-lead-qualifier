@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Request, Response, status
 
-from app.api.deps import SessionDep, SettingsDep
+from app.api.deps import RateLimiterDep, SessionDep, SettingsDep, enforce_rate_limit
 from app.api.v1.schemas import LeadAccepted
 from app.db.models.webhook import WebhookProvider
 from app.errors import AppError, ErrorResponse
@@ -65,6 +65,7 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
         409: {"model": ErrorResponse, "description": "Event ID reused with another payload"},
         413: {"model": ErrorResponse, "description": f"Body over {MAX_BODY_BYTES} bytes"},
         422: {"model": ErrorResponse, "description": "Signed, but not a usable lead"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded; see Retry-After"},
     },
 )
 async def receive_webhook(
@@ -74,6 +75,7 @@ async def receive_webhook(
     response: Response,
     session: SessionDep,
     settings: SettingsDep,
+    limiter: RateLimiterDep,
 ) -> LeadAccepted:
     body = await _read_body(request)
     endpoint = await webhook_service.get_active_endpoint(session, endpoint_id, provider)
@@ -85,6 +87,10 @@ async def receive_webhook(
     )
     if not adapter.verify(secret, body, request.headers, now=time.time()):
         raise InvalidSignatureError("Invalid webhook signature.")
+    # Counted only once the signature checks out, so forged requests to a (public) endpoint
+    # URL can't use up the real sender's allowance.
+    limit = settings.rate_limit_writes_per_minute
+    enforce_rate_limit(limiter, f"webhook:{endpoint.id}", limit, response)
     try:
         inbound = adapter.parse(body)
     except InvalidPayloadError as exc:

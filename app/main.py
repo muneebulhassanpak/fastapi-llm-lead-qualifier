@@ -14,6 +14,7 @@ from app.errors import ErrorResponse, register_error_handlers
 from app.llm.factory import build_provider
 from app.logging import configure_logging, get_logger
 from app.middleware import RequestContextMiddleware
+from app.ratelimit import SlidingWindowLimiter
 from app.worker.registry import default_handlers
 from app.worker.runner import Worker, WorkerConfig
 
@@ -97,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = create_sessionmaker(engine)
+    app.state.rate_limiter = SlidingWindowLimiter()
     app.add_middleware(RequestContextMiddleware)
     register_error_handlers(app)
     app.include_router(api_router)

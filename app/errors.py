@@ -35,10 +35,13 @@ class AppError(Exception):
     status_code: int = HTTPStatus.BAD_REQUEST
     code: str = "bad_request"
 
-    def __init__(self, message: str, *, details: Any | None = None) -> None:
+    def __init__(
+        self, message: str, *, details: Any | None = None, headers: dict[str, str] | None = None
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details
+        self.headers = headers
 
 
 class UnauthorizedError(AppError):
@@ -54,6 +57,11 @@ class NotFoundError(AppError):
 class ConflictError(AppError):
     status_code = HTTPStatus.CONFLICT
     code = "conflict"
+
+
+class RateLimitedError(AppError):
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+    code = "rate_limited"
 
 
 class BadRequestError(AppError):
@@ -94,9 +102,11 @@ def error_response(
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
-        headers = {"WWW-Authenticate": "ApiKey"} if isinstance(exc, UnauthorizedError) else None
+        headers = dict(exc.headers or {})
+        if isinstance(exc, UnauthorizedError):
+            headers["WWW-Authenticate"] = "ApiKey"
         return error_response(
-            request, exc.status_code, exc.code, exc.message, exc.details, headers=headers
+            request, exc.status_code, exc.code, exc.message, exc.details, headers=headers or None
         )
 
     @app.exception_handler(StarletteHTTPException)
