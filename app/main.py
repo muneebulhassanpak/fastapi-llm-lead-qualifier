@@ -31,6 +31,13 @@ and syncs approved leads to a CRM with retries and idempotency.
 OPENAPI_TAGS = [
     {"name": "health", "description": "Liveness and dependency checks."},
     {"name": "leads", "description": "Submit enquiries and read their qualification results."},
+    {
+        "name": "review",
+        "description": (
+            "Work the review queue (`GET /v1/leads?status=needs_review`): approve or reject, "
+            "and retry leads that failed."
+        ),
+    },
 ]
 
 

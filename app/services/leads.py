@@ -163,6 +163,7 @@ async def get_lead(session: AsyncSession, tenant_id: str, lead_id: str) -> Lead 
         select(Lead)
         .where(Lead.id == lead_id, Lead.tenant_id == tenant_id)
         .options(selectinload(Lead.events), selectinload(Lead.sync_attempts))
+        .execution_options(populate_existing=True)
     )
 
 

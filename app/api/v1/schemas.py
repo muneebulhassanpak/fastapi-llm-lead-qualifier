@@ -137,6 +137,29 @@ class LeadDetail(LeadSummary):
         )
 
 
+Note = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+
+class ApproveRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"note": "Fits our Q3 focus.", "score_override": 75}]},
+    )
+
+    note: Note | None = Field(default=None, description="Why, for the audit trail.")
+    score_override: int | None = Field(
+        default=None, ge=0, le=100, description="Replace the model's score. Both are audited."
+    )
+
+
+class RejectRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra={"examples": [{"note": "Outside our market."}]}
+    )
+
+    note: Note | None = Field(default=None, description="Why, for the audit trail.")
+
+
 class LeadList(BaseModel):
     data: list[LeadSummary]
     next_cursor: str | None = Field(
