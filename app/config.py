@@ -4,8 +4,10 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Self
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.db.url import to_async_url
 
 
 class AppEnv(StrEnum):
@@ -34,7 +36,9 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     log_level: str = "INFO"
 
+    # Any Postgres URL works, including Neon's as copied (see app/db/url.py).
     database_url: str = "postgresql+asyncpg://leadqual:leadqual@localhost:5433/leadqual"
+    idempotency_ttl_hours: int = Field(default=24, gt=0)
 
     api_key_pepper: SecretStr = SecretStr("")
     webhook_secret_key: SecretStr = SecretStr("")
@@ -62,6 +66,12 @@ class Settings(BaseSettings):
     rate_limit_reads_per_minute: int = Field(default=300, gt=0)
 
     demo_retention_days: int = Field(default=7, gt=0)
+
+    @field_validator("database_url")
+    @classmethod
+    def _check_database_url(cls, value: str) -> str:
+        to_async_url(value)  # raises on a malformed or non-Postgres URL
+        return value
 
     @property
     def is_production(self) -> bool:

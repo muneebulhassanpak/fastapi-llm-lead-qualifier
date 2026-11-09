@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from app.api.v1.router import api_router
 from app.config import AppEnv, Settings, get_settings
+from app.db.engine import create_engine, create_sessionmaker, wait_for_database
 from app.errors import ErrorResponse, register_error_handlers
 from app.logging import configure_logging, get_logger
 from app.middleware import RequestContextMiddleware
@@ -22,6 +23,7 @@ and syncs approved leads to a CRM with retries and idempotency.
 
 OPENAPI_TAGS = [
     {"name": "health", "description": "Liveness and dependency checks."},
+    {"name": "leads", "description": "Submit enquiries and read their qualification results."},
 ]
 
 
@@ -29,11 +31,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, json=settings.app_env is not AppEnv.DEVELOPMENT)
     log = get_logger(__name__)
+    engine = create_engine(settings.database_url)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         log.info("startup", env=settings.app_env, version=settings.app_version)
+        # Start even if the database is still waking up; /v1/health reports it until it is.
+        await wait_for_database(engine)
         yield
+        await engine.dispose()
         log.info("shutdown")
 
     app = FastAPI(
@@ -50,6 +56,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.engine = engine
+    app.state.sessionmaker = create_sessionmaker(engine)
     app.add_middleware(RequestContextMiddleware)
     register_error_handlers(app)
     app.include_router(api_router)

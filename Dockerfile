@@ -18,6 +18,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 
 COPY app ./app
+COPY migrations ./migrations
+COPY alembic.ini ./
+COPY docker/entrypoint.sh ./entrypoint.sh
 
 # ---- Runtime stage: slim image, non-root user, no build tools ----
 FROM python:3.12-slim AS runtime
@@ -39,4 +42,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/v1/health', timeout=4)"
 
 # PORT is set by the hosting platform (Render); defaults to 8000 locally.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*' --no-access-log"]
+# RUN_MIGRATIONS=true applies Alembic migrations before the server starts.
+CMD ["./entrypoint.sh"]
