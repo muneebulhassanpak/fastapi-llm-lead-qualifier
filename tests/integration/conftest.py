@@ -20,12 +20,14 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from pydantic import SecretStr
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.api.deps import get_session
 from app.config import AppEnv, Settings
-from app.db.engine import create_engine
+from app.db.base import Base
+from app.db.engine import create_engine, create_sessionmaker
 from app.db.models import Lead, Tenant
 from app.domain.status import LeadStatus
 from app.main import create_app
@@ -159,3 +161,23 @@ def make_lead(db_session: AsyncSession) -> MakeLead:
         return lead
 
     return _make
+
+
+@pytest_asyncio.fixture
+async def committed(engine: AsyncEngine) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Sessions that really commit, for tests that need several connections (locking,
+    concurrency, the worker). Every table is emptied afterwards."""
+    yield create_sessionmaker(engine)
+    async with engine.begin() as conn:
+        tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
+        await conn.execute(text(f"TRUNCATE {tables} CASCADE"))
+
+
+async def seed_lead(sessionmaker: async_sessionmaker[AsyncSession]) -> Lead:
+    """A committed tenant and lead to hang jobs on."""
+    async with sessionmaker() as session:
+        tenant = await tenant_service.create_tenant(session, "Queue Co")
+        lead = Lead(tenant_id=tenant.id, status=LeadStatus.RECEIVED, source="api", message="Hi")
+        session.add(lead)
+        await session.commit()
+        return lead
