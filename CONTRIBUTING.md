@@ -6,19 +6,26 @@
 
 1. Open or pick an issue. Each issue belongs to a phase milestone.
 2. Create a branch from `main` named `<type>/<phase>-<short-desc>`, for example `feat/03-api-keys`.
-3. Commit, push, and open a PR. Fill in the PR template and link the issue (`Closes #12`).
-4. CI must pass: `lint`, `typecheck`, `test` and `pr-title`. Review conversations must be resolved.
-5. PRs are squash-merged, so the PR title becomes the commit message on `main`. The branch is deleted after merge.
+3. Make small commits, one logical step each, with its tests. Every commit should pass lint, format and type checks on its own.
+4. Push and open a PR. Fill in the PR template and link the issue (`Closes #12`).
+5. CI must pass: `lint`, `typecheck`, `test`, `migrations`, `docker`, `pr-title` and `commit-messages`. Review conversations must be resolved.
+6. PRs are **rebase-merged**: every commit lands on `main` as it is, and history stays linear. Rebase on `main` and squash any fixup commits before merging. The branch is deleted after merge.
 
-## PR titles
+## Commit messages and PR titles
 
-PR titles follow [Conventional Commits](https://www.conventionalcommits.org/):
+Both follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-<type>: <lowercase subject without a trailing period>
+<type>(<optional scope>): <subject>
+
+<optional body: why, not what>
 ```
 
-Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`.
+Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `revert`.
+Scopes used here: `api`, `db`, `worker`, `llm`, `crm`, `webhooks`.
+Subjects start lowercase, have no trailing period, and stay under 100 characters.
+
+To fix an earlier commit on your branch, use `git commit --fixup=<sha>` and then `git rebase --autosquash main`. CI rejects leftover fixup commits.
 
 ## Definition of done
 

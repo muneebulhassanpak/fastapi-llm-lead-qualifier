@@ -14,7 +14,8 @@ Closes #
 
 ## Checklist
 
-- [ ] PR title follows Conventional Commits (`feat:`, `fix:`, `chore:`, ...)
+- [ ] PR title and every commit message follow Conventional Commits (`feat:`, `fix:`, `chore:`, ...)
+- [ ] Commits are small and each one passes the checks on its own
 - [ ] Tests added or updated for new behaviour
 - [ ] New settings added to `.env.example`
 - [ ] Database changes include an Alembic migration
