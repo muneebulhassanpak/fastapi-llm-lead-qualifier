@@ -33,3 +33,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A mock CRM that can fail on purpose (a fail rate, or a per-lead 503, 429 or 422) to show the retry path.
 - `GET /v1/leads/{id}` shows the CRM provider, external ID, attempt count and last error.
 - Review endpoints: `POST /v1/leads/{id}/approve` (optional note and score override) and `/reject` for leads in `needs_review`, and `/retry` to re-sync a `sync_failed` lead or re-qualify one the model failed on. Every action is audited with the caller's key; concurrent actions on one lead give one success and a `409` with the current status.
+- Signed inbound webhooks at `POST /v1/webhooks/{provider}/{endpoint_id}`, for a generic format (timestamped HMAC, 5-minute replay window) and Tally forms. Secrets are encrypted at rest, deliveries are deduplicated by event ID, and bodies are limited to 64 KB. CLI commands `create-webhook` and `revoke-webhook`, and `scripts/send_webhook.py` to try them.
+- Per-key rate limits for reads and writes, and per-endpoint limits for webhooks, with `X-RateLimit-*` headers and `429` plus `Retry-After`.

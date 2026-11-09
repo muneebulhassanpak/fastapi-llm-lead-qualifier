@@ -113,6 +113,29 @@ Approving a lead (automatically or, from Phase 07, by a person) queues a `sync_l
 - `CRMPermanentError` (a 4xx) dead-letters at once; `CRMTransientError` retries with backoff, waiting at least its `retry_after`. Up to `CRM_MAX_ATTEMPTS` tries, then the lead is `sync_failed`.
 - v1 ships only the mock adapter, which writes to `mock_crm_records`. To see failures, set `MOCK_CRM_FAIL_RATE`, or create a lead with `"metadata": {"simulate_crm_failure": "unavailable"}` (503), `"rate_limited"` (429) or `"invalid"` (422).
 
+## Webhooks
+
+Outside services post enquiries to `POST /v1/webhooks/{provider}/{endpoint_id}`. Each endpoint belongs to one tenant and has its own signing secret, stored encrypted with `WEBHOOK_SECRET_KEY`.
+
+```bash
+uv run python -m app.cli create-webhook --tenant tn_... --provider generic   # or tally
+export WEBHOOK_SECRET=whsec_...    # the secret it printed
+uv run python -m scripts.send_webhook --endpoint whk_... --provider generic
+```
+
+- **generic:** `X-Timestamp` (unix seconds) and `X-Signature: sha256=<hex HMAC-SHA256 of "{timestamp}.{body}">`. Deliveries more than 5 minutes old or in the future are refused. Body: `{"event_id": "...", "lead": {...same fields as POST /v1/leads...}}`.
+- **tally:** paste the endpoint URL and the secret into the form's webhook settings (Tally signs with `Tally-Signature`). Long-text answers become the message, and other answers are added as `Label: value` lines.
+- Signatures are checked over the raw body, compared in constant time. Every failure is the same `401`.
+- The provider's event ID is the idempotency key for 72 hours, so a redelivery returns the original lead (`200`).
+- Bodies over 64 KB get `413`.
+- To add a provider: write an adapter with `verify` and `parse` (`app/webhooks/base.py`), add it to `WebhookProvider` and `ADAPTERS`, and add a fixture payload from the provider's docs.
+
+## Rate limits
+
+Every API key has a per-minute limit for reads (`RATE_LIMIT_READS_PER_MINUTE`) and for writes (`RATE_LIMIT_WRITES_PER_MINUTE`, which also covers review actions). Each webhook endpoint has the write limit, counted only after its signature checks out. Responses carry `X-RateLimit-Limit`, `-Remaining` and `-Reset`; over the limit is `429` with `Retry-After`.
+
+Counts are kept in memory over a sliding window, per process. With several instances, each counts separately; scaling out would mean moving the counters to Redis or Postgres.
+
 ## Database migrations
 
 ```bash
