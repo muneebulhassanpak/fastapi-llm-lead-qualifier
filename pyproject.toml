@@ -1,5 +1,5 @@
 [project]
-name = "lead-qualification-api"
+name = "fastapi-llm-lead-qualifier"
 version = "0.1.0"
 description = "FastAPI service that scores sales enquiries with an LLM, routes uncertain ones to human review, and syncs approved leads to a CRM."
 readme = "README.md"
