@@ -118,3 +118,12 @@ def test_create_webhook_needs_the_server_key(
 
     assert result.exit_code == 1
     assert "WEBHOOK_SECRET_KEY" in result.output
+
+
+def test_cleanup_needs_confirmation_and_reports_counts() -> None:
+    aborted = runner.invoke(cli_module.cli, ["cleanup", "--older-than-days", "7"], input="n\n")
+    confirmed = runner.invoke(cli_module.cli, ["cleanup", "--older-than-days", "7", "--yes"])
+
+    assert aborted.exit_code == 1
+    assert confirmed.exit_code == 0, confirmed.output
+    assert "Deleted 0 leads and 0 mock CRM records." in confirmed.output

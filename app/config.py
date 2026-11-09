@@ -67,7 +67,13 @@ class Settings(BaseSettings):
     rate_limit_writes_per_minute: int = Field(default=60, gt=0)
     rate_limit_reads_per_minute: int = Field(default=300, gt=0)
 
-    demo_retention_days: int = Field(default=7, gt=0)
+    # Delete leads older than this many days (hourly, while the worker runs). Unset: never.
+    demo_retention_days: int | None = Field(default=None, gt=0)
+
+    @field_validator("demo_retention_days", mode="before")
+    @classmethod
+    def _blank_means_unset(cls, value: object) -> object:
+        return None if value == "" else value
 
     @field_validator("database_url")
     @classmethod

@@ -28,3 +28,18 @@ async def test_lifespan_starts_and_stops_the_worker(settings: Settings) -> None:
 
     assert task.done()
     assert task.exception() is None
+
+
+async def test_lifespan_runs_cleanup_only_when_configured(settings: Settings) -> None:
+    off = create_app(settings.model_copy(update={"worker_enabled": True}))
+    on = create_app(settings.model_copy(update={"worker_enabled": True, "demo_retention_days": 7}))
+
+    async with off.router.lifespan_context(off):
+        assert off.state.cleanup_task is None
+    async with on.router.lifespan_context(on):
+        task = on.state.cleanup_task
+        assert task is not None
+        assert not task.done()
+
+    assert task.done()
+    assert task.exception() is None
