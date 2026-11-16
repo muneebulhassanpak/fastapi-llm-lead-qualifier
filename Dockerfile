@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build stage: resolve and install dependencies with uv ----
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /uvx /bin/
 
@@ -23,7 +23,7 @@ COPY alembic.ini ./
 COPY docker/entrypoint.sh ./entrypoint.sh
 
 # ---- Runtime stage: slim image, non-root user, no build tools ----
-FROM python:3.12-slim AS runtime
+FROM python:3.15-slim AS runtime
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
